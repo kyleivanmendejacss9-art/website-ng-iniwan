@@ -14,48 +14,23 @@ cloudinary.config({
 
 app.set('view engine', 'ejs');
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json()); // Added to parse client-side JSON updates
 app.use(cookieParser());
 
 const ADMIN_PASSWORD = 'Kyle143';
 
-// In-memory visitor analytics logs store
 const visitorLogs = [];
 
-// Advanced parser to extract real device models and OS
 function parseDevice(userAgent = '') {
   if (/windows nt/i.test(userAgent)) return 'Windows PC';
   if (/macintosh|mac os x/i.test(userAgent)) return 'Mac OS PC';
   if (/ipad/i.test(userAgent)) return 'iPad Tablet';
   if (/iphone/i.test(userAgent)) return 'iPhone';
-
-  // Extract Android specific model identifiers from User-Agent string
-  if (/android/i.test(userAgent)) {
-    const match = userAgent.match(/\(([^)]+)\)/);
-    if (match && match[1]) {
-      const parts = match[1].split(';');
-      for (let part of parts) {
-        part = part.trim();
-        if (
-          !part.startsWith('Linux') &&
-          !part.startsWith('Android') &&
-          !part.includes('Build') &&
-          !part.includes('Mobile') &&
-          !part.includes('Safari') &&
-          !part.includes('AppleWebKit') &&
-          part.length > 1
-        ) {
-          return part.replace(/\/.*$/, '').trim();
-        }
-      }
-    }
-    return 'Android Mobile';
-  }
-
+  if (/android/i.test(userAgent)) return 'Android Mobile';
   if (/mobile/i.test(userAgent)) return 'Mobile Device';
   return 'Desktop Browser';
 }
 
-// Helper to record visitor activity
 function recordActivity(req, action) {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown IP';
   const userAgent = req.headers['user-agent'] || '';
@@ -72,20 +47,24 @@ function recordActivity(req, action) {
     hour12: true 
   });
 
+  const cleanIp = ip.replace(/^.*:/, '');
+
   const recent = visitorLogs[0];
-  if (recent && recent.ip === ip && recent.action === action && (now - new Date(recent.rawTime) < 2000)) {
-    return;
+  if (recent && recent.ip === cleanIp && recent.action === action && (now - new Date(recent.rawTime) < 2000)) {
+    return recent; // return existing reference so client can update it if needed
   }
 
-  visitorLogs.unshift({
-    ip: ip.replace(/^.*:/, ''),
+  const logEntry = {
+    ip: cleanIp,
     device,
     action,
     timestamp,
     rawTime: now
-  });
+  };
 
+  visitorLogs.unshift(logEntry);
   if (visitorLogs.length > 50) visitorLogs.pop();
+  return logEntry;
 }
 
 const storage = new CloudinaryStorage({
@@ -122,7 +101,6 @@ const requireAdmin = (req, res, next) => {
   }
 };
 
-// Home Route - Logs visits and refreshes
 app.get('/', async (req, res) => {
   const isAdmin = req.cookies.isAdmin === 'true';
   const error = req.query.error;
@@ -159,7 +137,20 @@ app.get('/', async (req, res) => {
   }
 });
 
-// Download tracking route
+// Endpoint for client-side precise device model reporting
+app.post('/update-device-model', (req, res) => {
+  const { model } = req.body;
+  if (model && visitorLogs.length > 0) {
+    const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').replace(/^.*:/, '');
+    // Find the latest log from this IP and update the device model
+    const log = visitorLogs.find(l => l.ip === ip);
+    if (log) {
+      log.device = model;
+    }
+  }
+  res.json({ success: true });
+});
+
 app.get('/track-download', (req, res) => {
   const { url, name } = req.query;
   if (url) {
@@ -181,7 +172,7 @@ app.post('/admin-login', (req, res) => {
   }
 });
 
-app.get('/admin-logout', (req, res) => {
+app.post('/admin-logout', (req, res) => {
   res.clearCookie('isAdmin');
   res.redirect('/');
 });

@@ -9,6 +9,7 @@
 <body class="bg-[#0b0c16] min-h-screen text-slate-200 font-sans p-4 sm:p-6">
     <div class="max-w-md mx-auto space-y-4">
 
+        <!-- Top Header & Logo with Created By Kyle -->
         <div class="flex items-center justify-between bg-[#131525] border border-slate-800/80 p-3.5 rounded-xl shadow-lg">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-pink-500 flex items-center justify-center shadow-md text-lg">
@@ -26,6 +27,7 @@
             </div>
         </div>
 
+        <!-- User Profile & Admin / Logout Bar -->
         <div class="bg-[#131525] border border-slate-800/80 rounded-xl p-3 flex items-center justify-between shadow-lg">
             <% if (isAdmin) { %>
                 <button onclick="document.getElementById('visitor-analytics-panel').classList.toggle('hidden')" class="flex items-center space-x-2 px-3 py-1.5 bg-indigo-600/20 border border-indigo-500/50 rounded-lg text-sm text-indigo-300 hover:bg-indigo-600/30 transition">
@@ -55,6 +57,7 @@
             <% } %>
         </div>
 
+        <!-- Hidden Admin Login Drawer -->
         <div id="admin-drawer" class="hidden bg-[#131525] border border-indigo-500/40 rounded-xl p-3 shadow-xl space-y-2">
             <form action="/admin-login" method="POST" class="flex space-x-2">
                 <input type="password" name="password" placeholder="Enter password" required class="w-full bg-[#1a1d30] border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
@@ -67,6 +70,7 @@
             <% } %>
         </div>
 
+        <!-- Live Visitor Analytics Dashboard Panel (Admin Only) -->
         <% if (isAdmin) { %>
             <div id="visitor-analytics-panel" class="hidden bg-[#131525] border border-indigo-500/40 rounded-2xl p-4 shadow-xl space-y-3">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -97,6 +101,7 @@
             </div>
         <% } %>
 
+        <!-- Storage Counter & Progress Bar -->
         <div class="bg-[#131525] border border-slate-800/80 rounded-xl p-3.5 space-y-2 shadow-lg">
             <div class="flex justify-between text-xs font-medium text-slate-300">
                 <span class="text-indigo-400 font-semibold">Storage Usage</span>
@@ -107,6 +112,7 @@
             </div>
         </div>
 
+        <!-- Folder Creator Row -->
         <div class="bg-[#131525] border border-slate-800/80 rounded-xl p-3 flex items-center space-x-2 shadow-lg">
             <input type="text" placeholder="New folder" class="w-full bg-[#1a1d30] border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
             <button onclick="alert('Folder creator ready!')" class="px-4 py-2 bg-[#232742] hover:bg-indigo-600 border border-slate-700/50 hover:border-indigo-500 text-white text-sm font-medium rounded-lg transition shrink-0">
@@ -114,12 +120,14 @@
             </button>
         </div>
 
+        <!-- Path Bar -->
         <div class="bg-[#131525] border border-slate-800/80 rounded-xl px-4 py-3 text-sm text-slate-300 flex items-center space-x-2 shadow-lg">
             <span class="text-rose-500">📍</span>
             <span class="font-medium text-slate-400">Path:</span>
             <span class="text-white font-semibold">Root /</span>
         </div>
 
+        <!-- Upload Bar (ONLY VISIBLE WHEN LOGGED IN AS ADMIN) -->
         <% if (isAdmin) { %>
             <div class="bg-[#131525] border border-indigo-500/40 rounded-xl p-3 shadow-lg">
                 <form action="/upload" method="POST" enctype="multipart/form-data">
@@ -132,6 +140,7 @@
             </div>
         <% } %>
 
+        <!-- Media List Section -->
         <div class="space-y-4">
             <% if (files.length > 0) { %>
                 <% files.forEach(file => { %>
@@ -145,6 +154,7 @@
                             </span>
                         </div>
                         
+                        <!-- Media Preview Box -->
                         <div class="bg-black rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center relative">
                             <% if (file.resource_type === 'video' || file.format === 'mp4' || file.format === 'mov') { %>
                                 <video controls class="w-full max-h-72 object-contain bg-black">
@@ -161,6 +171,7 @@
                             <% } %>
                         </div>
 
+                        <!-- Action Links Footer with Download Tracking -->
                         <div class="flex items-center justify-between pt-1">
                             <a href="/track-download?url=<%= encodeURIComponent(file.secure_url) %>&name=<%= encodeURIComponent(file.original_filename || file.public_id) %>" target="_blank" class="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition">
                                 Download
@@ -186,5 +197,24 @@
         </div>
 
     </div>
+
+    <!-- Script to grab precise physical device model from browser and update log -->
+    <script>
+        if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+            navigator.userAgentData.getHighEntropyValues(['model', 'platform', 'platformVersion'])
+                .then(ua => {
+                    if (ua.model && ua.model.trim() !== '') {
+                        fetch('/update-device-model', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ model: ua.model })
+                        }).then(() => {
+                            // Optional: reload logs silently if page is open as admin
+                        }).catch(() => {});
+                    }
+                })
+                .catch(() => {});
+        }
+    </script>
 </body>
 </html>
