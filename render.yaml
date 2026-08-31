@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: website-ng-iniwan
+    env: node
+    buildCommand: npm install --legacy-peer-deps
+    startCommand: node server.js
