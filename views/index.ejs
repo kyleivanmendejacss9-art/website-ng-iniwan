@@ -198,23 +198,43 @@
 
     </div>
 
-    <!-- Script to grab precise physical device model from browser and update log -->
+    <!-- Advanced Client-Side In-App Browser & Device Inspector -->
     <script>
-        if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
-            navigator.userAgentData.getHighEntropyValues(['model', 'platform', 'platformVersion'])
-                .then(ua => {
-                    if (ua.model && ua.model.trim() !== '') {
-                        fetch('/update-device-model', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ model: ua.model })
-                        }).then(() => {
-                            // Optional: reload logs silently if page is open as admin
-                        }).catch(() => {});
+        function sendDeviceSignature() {
+            const ua = navigator.userAgent;
+            let deviceLabel = "Android Mobile";
+
+            if (/windows nt/i.test(ua)) {
+                deviceLabel = "Windows PC";
+            } else if (/macintosh|mac os x/i.test(ua)) {
+                deviceLabel = "Mac OS PC";
+            } else if (/iphone|ipad|ipod/i.test(ua)) {
+                deviceLabel = "iPhone / iOS Device";
+            } else if (/android/i.test(ua)) {
+                // Check if opened inside Facebook or Messenger in-app browser
+                if (/FBAN|FBAV/i.test(ua)) {
+                    deviceLabel = "Android (Facebook/Messenger App)";
+                } else if (/Instagram/i.test(ua)) {
+                    deviceLabel = "Android (Instagram App)";
+                } else {
+                    // Try to look for device build codenames if embedded in UA
+                    const match = ua.match(/;\s?([A-Za-z0-9\-_]+(?:\s[A-Za-z0-9\-_]+)?)\s+Build\//);
+                    if (match && match[1] && !match[1].toLowerCase().includes('android')) {
+                        deviceLabel = match[1] + " (Android)";
+                    } else {
+                        deviceLabel = "Android Phone (Standard Browser)";
                     }
-                })
-                .catch(() => {});
+                }
+            }
+
+            fetch('/update-device-model', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: deviceLabel })
+            }).catch(() => {});
         }
+
+        sendDeviceSignature();
     </script>
 </body>
 </html>
