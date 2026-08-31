@@ -1,7 +1,7 @@
 {
   "name": "website-ng-iniwan",
   "version": "1.0.0",
-  "description": "File sharing website",
+  "description": "AURORA Media Hub with Admin Authentication",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -9,6 +9,9 @@
   "dependencies": {
     "express": "^4.19.2",
     "multer": "^1.4.5-lts.1",
-    "ejs": "^3.1.10"
+    "ejs": "^3.1.10",
+    "cloudinary": "^2.0.0",
+    "multer-storage-cloudinary": "^4.0.0",
+    "cookie-parser": "^1.4.6"
   }
 }
