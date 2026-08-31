@@ -7,7 +7,6 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Admin password
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Kyle143';
 
 cloudinary.config({
