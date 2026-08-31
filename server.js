@@ -6,7 +6,6 @@ const cookieParser = require('cookie-parser');
 
 const app = express();
 
-// Configure Cloudinary credentials from environment variables
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -19,7 +18,6 @@ app.use(cookieParser());
 
 const ADMIN_PASSWORD = 'Kyle143';
 
-// Configure Cloudinary Storage with Automatic Compression
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req, file) => {
@@ -43,7 +41,6 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage: storage });
 
-// Admin Auth Middleware
 const requireAdmin = (req, res, next) => {
   if (req.cookies.isAdmin === 'true') {
     next();
@@ -52,48 +49,58 @@ const requireAdmin = (req, res, next) => {
   }
 };
 
-// Home Route - View Hub
 app.get('/', async (req, res) => {
   const isAdmin = req.cookies.isAdmin === 'true';
   const error = req.query.error;
   try {
-    // Fetch resources from Cloudinary
     const result = await cloudinary.search
       .expression('folder:website-ng-iniwan')
       .sort_by('created_at', 'desc')
       .max_results(30)
       .execute();
 
-    res.render('index', { files: result.resources, isAdmin, error });
+    // Calculate total storage in MB
+    let totalBytes = 0;
+    result.resources.forEach(file => {
+      totalBytes += file.bytes || 0;
+    });
+    const totalStorageMB = (totalBytes / (1024 * 1024)).toFixed(2);
+    const storageLimitMB = 100;
+    const storagePercent = Math.min(100, (totalStorageMB / storageLimitMB) * 100).toFixed(1);
+
+    res.render('index', { 
+      files: result.resources, 
+      isAdmin, 
+      error, 
+      totalStorageMB, 
+      storageLimitMB, 
+      storagePercent 
+    });
   } catch (err) {
     console.error('Error fetching files:', err);
-    res.render('index', { files: [], isAdmin, error: 'Failed to load media.' });
+    res.render('index', { files: [], isAdmin, error: 'Failed to load media.', totalStorageMB: '0.00', storageLimitMB: 100, storagePercent: 0 });
   }
 });
 
-// Admin Login Route
 app.post('/admin-login', (req, res) => {
   const { password } = req.body;
   if (password === ADMIN_PASSWORD) {
-    res.cookie('isAdmin', 'true', { httpOnly: true, maxAge: 86400000 }); // 1 day
+    res.cookie('isAdmin', 'true', { httpOnly: true, maxAge: 86400000 });
     res.redirect('/');
   } else {
     res.redirect('/?error=Incorrect Password');
   }
 });
 
-// Admin Logout Route
 app.get('/admin-logout', (req, res) => {
   res.clearCookie('isAdmin');
   res.redirect('/');
 });
 
-// Upload Route (Admin Only)
 app.post('/upload', requireAdmin, upload.single('file'), (req, res) => {
   res.redirect('/');
 });
 
-// Delete Route (Admin Only)
 app.post('/delete', requireAdmin, async (req, res) => {
   const { public_id, resource_type } = req.body;
   try {
