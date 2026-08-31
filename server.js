@@ -14,14 +14,12 @@ cloudinary.config({
 
 app.set('view engine', 'ejs');
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
 app.use(cookieParser());
 
 const ADMIN_PASSWORD = 'Kyle143';
 
 const visitorLogs = [];
 
-// Helper to reliably extract the clean client IP
 function getClientIp(req) {
   const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) {
@@ -32,32 +30,41 @@ function getClientIp(req) {
   return socketIp.replace(/^.*:/, '');
 }
 
+// Advanced server-side device & app detector
 function parseDevice(userAgent = '') {
   if (/windows nt/i.test(userAgent)) return 'Windows PC';
   if (/macintosh|mac os x/i.test(userAgent)) return 'Mac OS PC';
   if (/ipad/i.test(userAgent)) return 'iPad Tablet';
-  if (/iphone/i.test(userAgent)) return 'iPhone';
+  if (/iphone/i.test(userAgent)) return 'iPhone / iOS';
   
   if (/android/i.test(userAgent)) {
-    // Try to extract device build name if present in parentheses
-    const match = userAgent.match(/\(([^)]+)\)/);
-    if (match && match[1]) {
-      const parts = match[1].split(';');
+    let appTag = '';
+    if (/FBAN|FBAV/i.test(userAgent)) appTag = ' (Facebook App)';
+    else if (/Instagram/i.test(userAgent)) appTag = ' (Instagram App)';
+    else if (/Messenger/i.test(userAgent)) appTag = ' (Messenger App)';
+
+    // Extract exact model before Build/ (e.g. SM-A075F, Pixel, etc.)
+    const buildMatch = userAgent.match(/;\s?([A-Za-z0-9\-_\s]+?)\s+Build\//i);
+    if (buildMatch && buildMatch[1]) {
+      let model = buildMatch[1].trim();
+      if (!/android|linux|mobile|version|wv/i.test(model) && model.length > 1) {
+        return model + appTag;
+      }
+    }
+
+    // Fallback search for device codes in parentheses
+    const parenMatch = userAgent.match(/\(([^)]+)\)/);
+    if (parenMatch && parenMatch[1]) {
+      const parts = parenMatch[1].split(';');
       for (let part of parts) {
         part = part.trim();
-        if (
-          !part.startsWith('Linux') &&
-          !part.startsWith('Android') &&
-          !part.includes('Build') &&
-          !part.includes('Mobile') &&
-          !part.includes('Safari') &&
-          part.length > 2
-        ) {
-          return part.replace(/\/.*$/, '').trim();
+        if (/^(SM-|GT-|SCH-|SPH-|SGH-|LGL|LM-|XT|Moto|Pixel|Redmi|Xiaomi|POCO|M2|CPH|RMX|V2|Infinix|TECNO)/i.test(part)) {
+          return part + appTag;
         }
       }
     }
-    return 'Android Phone';
+
+    return 'Android Phone' + appTag;
   }
 
   if (/mobile/i.test(userAgent)) return 'Mobile Device';
@@ -166,18 +173,6 @@ app.get('/', async (req, res) => {
     console.error('Error fetching files:', err);
     res.render('index', { files: [], isAdmin, error: 'Failed to load media.', totalStorageMB: '0.00', storageLimitMB: 100, storagePercent: 0, visitorLogs: [] });
   }
-});
-
-app.post('/update-device-model', (req, res) => {
-  const { model } = req.body;
-  const ip = getClientIp(req);
-  if (model && visitorLogs.length > 0) {
-    const log = visitorLogs.find(l => l.ip === ip);
-    if (log) {
-      log.device = model;
-    }
-  }
-  res.json({ success: true });
 });
 
 app.get('/track-download', (req, res) => {
