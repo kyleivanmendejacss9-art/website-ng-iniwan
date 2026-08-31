@@ -18,6 +18,56 @@ app.use(cookieParser());
 
 const ADMIN_PASSWORD = 'Kyle143';
 
+// In-memory visitor analytics logs store
+const visitorLogs = [];
+
+// Helper function to parse device model/OS from User-Agent
+function parseDevice(userAgent = '') {
+  if (/android/i.test(userAgent)) return 'Android Device';
+  if (/iphone|ipad|ipod/i.test(userAgent)) return 'iOS Device / iPhone';
+  if (/windows/i.test(userAgent)) return 'Windows PC';
+  if (/macintosh|mac os x/i.test(userAgent)) return 'Mac OS';
+  if (/linux/i.test(userAgent)) return 'Linux Device';
+  if (/mobile/i.test(userAgent)) return 'Mobile Browser';
+  return 'Desktop Browser';
+}
+
+// Helper to record visitor activity
+function recordActivity(req, action) {
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown IP';
+  const userAgent = req.headers['user-agent'] || '';
+  const device = parseDevice(userAgent);
+  const now = new Date();
+  
+  // Format date and time nicely (e.g. Aug 31, 2026, 6:15 PM)
+  const timestamp = now.toLocaleString('en-US', { 
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric', 
+    hour: 'numeric', 
+    minute: '2-digit', 
+    second: '2-digit',
+    hour12: true 
+  });
+
+  // Prevent duplicate back-to-back instant visit spam from same IP within 2 seconds
+  const recent = visitorLogs[0];
+  if (recent && recent.ip === ip && recent.action === action && (now - new Date(recent.rawTime) < 2000)) {
+    return;
+  }
+
+  visitorLogs.unshift({
+    ip: ip.replace(/^.*:/, ''), // clean IPv6 prefix if present
+    device,
+    action,
+    timestamp,
+    rawTime: now
+  });
+
+  // Keep only the latest 50 logs to save memory
+  if (visitorLogs.length > 50) visitorLogs.pop();
+}
+
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req, file) => {
@@ -36,7 +86,7 @@ const storage = new CloudinaryStorage({
       quality: 'auto:eco',
       fetch_format: 'auto',
       transformation: [
-        { width: 1920, height: 1080, crop: 'limit' } // Caps oversized 4K/giant uploads to 1080p max safely
+        { width: 1920, height: 1080, crop: 'limit' }
       ]
     };
   }
@@ -52,9 +102,14 @@ const requireAdmin = (req, res, next) => {
   }
 };
 
+// Home Route - Logs visits and refreshes
 app.get('/', async (req, res) => {
   const isAdmin = req.cookies.isAdmin === 'true';
   const error = req.query.error;
+
+  // Record visit or page refresh
+  recordActivity(req, 'Opened / Refreshed Website');
+
   try {
     const result = await cloudinary.search
       .expression('folder:website-ng-iniwan')
@@ -76,11 +131,24 @@ app.get('/', async (req, res) => {
       error, 
       totalStorageMB, 
       storageLimitMB, 
-      storagePercent 
+      storagePercent,
+      visitorLogs: isAdmin ? visitorLogs : [] // Only expose logs to admin
     });
   } catch (err) {
     console.error('Error fetching files:', err);
-    res.render('index', { files: [], isAdmin, error: 'Failed to load media.', totalStorageMB: '0.00', storageLimitMB: 100, storagePercent: 0 });
+    res.render('index', { files: [], isAdmin, error: 'Failed to load media.', totalStorageMB: '0.00', storageLimitMB: 100, storagePercent: 0, visitorLogs: [] });
+  }
+});
+
+// Download tracking route
+app.get('/track-download', (req, res) => {
+  const { url, name } = req.query;
+  if (url) {
+    const fileName = name || 'Media File';
+    recordActivity(req, `Downloaded: ${fileName}`);
+    res.redirect(url);
+  } else {
+    res.redirect('/');
   }
 });
 
