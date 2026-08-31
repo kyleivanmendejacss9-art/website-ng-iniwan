@@ -14,25 +14,58 @@ cloudinary.config({
 
 app.set('view engine', 'ejs');
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json()); // Added to parse client-side JSON updates
+app.use(express.json());
 app.use(cookieParser());
 
 const ADMIN_PASSWORD = 'Kyle143';
 
 const visitorLogs = [];
 
+// Helper to reliably extract the clean client IP
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const ip = forwarded.split(',')[0].trim();
+    return ip.replace(/^.*:/, '');
+  }
+  const socketIp = req.socket.remoteAddress || 'Unknown IP';
+  return socketIp.replace(/^.*:/, '');
+}
+
 function parseDevice(userAgent = '') {
   if (/windows nt/i.test(userAgent)) return 'Windows PC';
   if (/macintosh|mac os x/i.test(userAgent)) return 'Mac OS PC';
   if (/ipad/i.test(userAgent)) return 'iPad Tablet';
   if (/iphone/i.test(userAgent)) return 'iPhone';
-  if (/android/i.test(userAgent)) return 'Android Mobile';
+  
+  if (/android/i.test(userAgent)) {
+    // Try to extract device build name if present in parentheses
+    const match = userAgent.match(/\(([^)]+)\)/);
+    if (match && match[1]) {
+      const parts = match[1].split(';');
+      for (let part of parts) {
+        part = part.trim();
+        if (
+          !part.startsWith('Linux') &&
+          !part.startsWith('Android') &&
+          !part.includes('Build') &&
+          !part.includes('Mobile') &&
+          !part.includes('Safari') &&
+          part.length > 2
+        ) {
+          return part.replace(/\/.*$/, '').trim();
+        }
+      }
+    }
+    return 'Android Phone';
+  }
+
   if (/mobile/i.test(userAgent)) return 'Mobile Device';
   return 'Desktop Browser';
 }
 
 function recordActivity(req, action) {
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown IP';
+  const ip = getClientIp(req);
   const userAgent = req.headers['user-agent'] || '';
   const device = parseDevice(userAgent);
   const now = new Date();
@@ -47,15 +80,13 @@ function recordActivity(req, action) {
     hour12: true 
   });
 
-  const cleanIp = ip.replace(/^.*:/, '');
-
   const recent = visitorLogs[0];
-  if (recent && recent.ip === cleanIp && recent.action === action && (now - new Date(recent.rawTime) < 2000)) {
-    return recent; // return existing reference so client can update it if needed
+  if (recent && recent.ip === ip && recent.action === action && (now - new Date(recent.rawTime) < 2000)) {
+    return recent;
   }
 
   const logEntry = {
-    ip: cleanIp,
+    ip,
     device,
     action,
     timestamp,
@@ -137,12 +168,10 @@ app.get('/', async (req, res) => {
   }
 });
 
-// Endpoint for client-side precise device model reporting
 app.post('/update-device-model', (req, res) => {
   const { model } = req.body;
+  const ip = getClientIp(req);
   if (model && visitorLogs.length > 0) {
-    const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').replace(/^.*:/, '');
-    // Find the latest log from this IP and update the device model
     const log = visitorLogs.find(l => l.ip === ip);
     if (log) {
       log.device = model;
