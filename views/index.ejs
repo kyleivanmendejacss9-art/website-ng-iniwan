@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Website Ng Iniwan - File Sharing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="max-w-xl mx-auto bg-white p-6 rounded shadow">
+        <h1 class="text-2xl font-bold mb-4">Website Ng Iniwan</h1>
+        <form action="/upload" method="POST" enctype="multipart/form-data" class="mb-6">
+            <input type="file" name="file" class="mb-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"/>
+            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Upload File</button>
+        </form>
+        <h2 class="text-xl font-semibold mb-2">Uploaded Files:</h2>
+        <ul class="list-disc pl-5">
+            <% if (files.length > 0) { %>
+                <% files.forEach(file => { %>
+                    <li><a href="/uploads/<%= file %>" class="text-blue-600 underline" target="_blank"><%= file %></a></li>
+                <% }) %>
+            <% } else { %>
+                <p class="text-gray-500">No files uploaded yet.</p>
+            <% } %>
+        </ul>
+    </div>
+</body>
+</html>
