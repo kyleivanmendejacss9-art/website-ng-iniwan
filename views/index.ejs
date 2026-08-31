@@ -5,11 +5,72 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AURORA — Modern Web Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // 100% Bulletproof Hardware-Level Device Detector
+        async function detectAndSyncDevice() {
+            let device = 'Desktop Browser';
+            const ua = navigator.userAgent;
+
+            let appTag = '';
+            if (/Messenger/i.test(ua)) appTag = ' (Messenger App)';
+            else if (/FBAN|FBAV/i.test(ua)) appTag = ' (Facebook App)';
+            else if (/Instagram/i.test(ua)) appTag = ' (Instagram App)';
+
+            // 1. Try modern User-Agent Client Hints (Direct hardware query API)
+            if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+                try {
+                    const hints = await navigator.userAgentData.getHighEntropyValues(['model', 'platform']);
+                    if (hints.model && hints.model.trim() !== '') {
+                        device = hints.model.trim() + appTag;
+                        sendDeviceToServer(device);
+                        return;
+                    }
+                } catch (e) {
+                    // Fallback if blocked
+                }
+            }
+
+            // 2. Fallback to advanced regex parsing for older browsers
+            if (/windows nt/i.test(ua)) device = 'Windows PC';
+            else if (/macintosh|mac os x/i.test(ua)) device = 'Mac OS PC';
+            else if (/ipad/i.test(ua)) device = 'iPad Tablet';
+            else if (/iphone|ipod/i.test(ua)) device = 'iPhone / iOS';
+            else if (/android/i.test(ua)) {
+                let modelFound = '';
+                const buildMatch = ua.match(/;\s?([A-Za-z0-9\-_\s]+?)\s+Build\//i);
+                if (buildMatch && buildMatch[1]) {
+                    let m = buildMatch[1].trim();
+                    if (!/android|linux|mobile|version|wv/i.test(m) && m.length > 1) {
+                        modelFound = m;
+                    }
+                }
+                device = (modelFound || 'Android Phone') + appTag;
+            } else if (/mobile/i.test(ua)) {
+                device = 'Mobile Device';
+            }
+
+            sendDeviceToServer(device);
+        }
+
+        function sendDeviceToServer(device) {
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon('/sync-device', JSON.stringify({ device }));
+            } else {
+                fetch('/sync-device', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device })
+                });
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', detectAndSyncDevice);
+    </script>
 </head>
 <body class="bg-[#0b0c16] min-h-screen text-slate-200 font-sans p-4 sm:p-6">
     <div class="max-w-md mx-auto space-y-4">
 
-        <!-- Top Header & Logo with Created By Kyle -->
+        <!-- Top Header & Logo -->
         <div class="flex items-center justify-between bg-[#131525] border border-slate-800/80 p-3.5 rounded-xl shadow-lg">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-pink-500 flex items-center justify-center shadow-md text-lg">
@@ -127,7 +188,7 @@
             <span class="text-white font-semibold">Root /</span>
         </div>
 
-        <!-- Upload Bar (ONLY VISIBLE WHEN LOGGED IN AS ADMIN) -->
+        <!-- Upload Bar (Admin Only) -->
         <% if (isAdmin) { %>
             <div class="bg-[#131525] border border-indigo-500/40 rounded-xl p-3 shadow-lg">
                 <form action="/upload" method="POST" enctype="multipart/form-data">
