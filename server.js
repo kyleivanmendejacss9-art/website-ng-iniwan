@@ -33,8 +33,11 @@ const storage = new CloudinaryStorage({
     return {
       folder: 'website-ng-iniwan',
       resource_type: resourceType,
-      quality: 'auto',
-      fetch_format: 'auto'
+      quality: 'auto:eco',
+      fetch_format: 'auto',
+      transformation: [
+        { width: 1920, height: 1080, crop: 'limit' } // Caps oversized 4K/giant uploads to 1080p max safely
+      ]
     };
   }
 });
@@ -59,7 +62,6 @@ app.get('/', async (req, res) => {
       .max_results(30)
       .execute();
 
-    // Calculate total storage in MB
     let totalBytes = 0;
     result.resources.forEach(file => {
       totalBytes += file.bytes || 0;
